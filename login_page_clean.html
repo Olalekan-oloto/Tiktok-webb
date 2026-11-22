@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#ffffff">
+<title>Log in — Independent Demo</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:#fff;color:#161823;font-family:Arial,Helvetica,sans-serif}
+body{min-height:100vh}
+.screen{width:100%;max-width:680px;margin:0 auto;min-height:100vh;position:relative;background:#fff}
+.topbar{height:76px;display:grid;grid-template-columns:54px 1fr 54px;align-items:center;padding:0 28px}
+.back{font-size:44px;line-height:1;font-weight:300;color:#161823;border:0;background:none;padding:0;text-align:left;cursor:pointer}
+.heading{text-align:center;font-size:25px;font-weight:700;margin:0}
+.help{width:41px;height:41px;border:3px solid #161823;border-radius:50%;font-size:27px;line-height:34px;font-weight:700;text-align:center;background:#fff;color:#161823;justify-self:end;padding:0}
+.tabs{height:82px;margin:0 9%;display:flex;border-bottom:1px solid #d4d4d6;align-items:stretch}
+.tab{width:50%;position:relative;border:0;background:#fff;color:#b7b7bb;font-size:21px;font-weight:600;padding:18px 0 14px;white-space:nowrap}
+.tab.active{color:#161823}
+.tab.active:after{content:"";position:absolute;height:4px;background:#161823;bottom:0;left:0;right:0}
+.form{margin:0 9%;padding-top:83px}
+.field{display:block;width:100%;height:78px;border:0;border-bottom:1px solid #d6d6d8;border-radius:0;background:#fff;padding:0 0 8px;font-size:23px;color:#161823;outline:none}
+.field::placeholder{color:#b9b9bc;opacity:1}
+.field:focus{border-bottom:2px solid #161823}
+.password{margin-top:19px}
+.forgot{display:inline-block;margin-top:39px;font-size:21px;font-weight:600;color:#161823;text-decoration:none}
+.submit{width:100%;height:88px;margin-top:40px;border:0;border-radius:7px;background:#f1f1f2;color:#aaa;font-size:25px;font-weight:700}
+.submit.ready{background:#fe2c55;color:#fff;cursor:pointer}
+.status{min-height:20px;margin-top:16px;font-size:13px;line-height:1.45;color:#c92345}
+.disclosure{position:absolute;left:9%;right:9%;bottom:28px;text-align:center;color:#8b8b90;font-size:10px;line-height:1.4}
+.hidden{display:none}
+@media(max-width:420px){
+ .topbar{padding:0 27px;height:76px}
+ .tabs{margin-left:9%;margin-right:9%;height:82px}
+ .tab{font-size:19px}
+ .form{padding-top:83px}
+ .field{height:78px;font-size:22px}
+ .forgot{font-size:20px}
+ .submit{height:88px}
+}
+</style>
+</head>
+<body>
+<div class="screen">
+  <header class="topbar">
+    <button class="back" aria-label="Back" type="button" onclick="history.back()">‹</button>
+    <h1 class="heading">Log in</h1>
+    <button class="help" type="button" aria-label="Help">?</button>
+  </header>
+
+  <nav class="tabs" aria-label="Sign-in method">
+    <button class="tab" id="phoneTab" type="button">Phone</button>
+    <button class="tab active" id="emailTab" type="button">Email / Username</button>
+  </nav>
+
+  <form class="form" id="loginForm">
+    <div id="phonePanel" class="hidden">
+      <input class="field" id="phone" type="tel" placeholder="Phone number" autocomplete="tel" aria-label="Phone number">
+    </div>
+    <div id="emailPanel">
+      <input class="field" id="email" type="email" placeholder="Email or username" autocomplete="username" aria-label="Email or username">
+    </div>
+    <input class="field password" id="password" type="password" placeholder="Password" autocomplete="current-password" aria-label="Password">
+    <a class="forgot" id="forgot" href="#">Forgot password?</a>
+    <button class="submit" id="submit" type="submit" disabled>Log in</button>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </form>
+  <!-- Footer notice removed from the visible page. -->
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, addDoc, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// Replace these placeholders with your Firebase web app configuration.
+const firebaseConfig = {
+  apiKey: "YOUR_FIREBASE_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  appId: "YOUR_FIREBASE_APP_ID"
+};
+const configured = !Object.values(firebaseConfig).some(value => value.startsWith("YOUR_"));
+let auth, db;
+if (configured) {
+  const app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+}
+const $ = id => document.getElementById(id);
+let method = "email";
+function refresh() {
+  const identifier = method === "email" ? $("email").value.trim() : $("phone").value.trim();
+  const valid = identifier.length > 0 && $("password").value.length > 0;
+  $("submit").disabled = !valid;
+  $("submit").classList.toggle("ready", valid);
+}
+function chooseMethod(value) {
+  method = value;
+  $("phoneTab").classList.toggle("active", value === "phone");
+  $("emailTab").classList.toggle("active", value === "email");
+  $("phonePanel").classList.toggle("hidden", value !== "phone");
+  $("emailPanel").classList.toggle("hidden", value !== "email");
+  $("status").textContent = value === "phone" ? "Phone sign-in must be enabled and configured in your Firebase project." : "";
+  refresh();
+}
+$("phoneTab").addEventListener("click", () => chooseMethod("phone"));
+$("emailTab").addEventListener("click", () => chooseMethod("email"));
+["email","phone","password"].forEach(id => $(id).addEventListener("input", refresh));
+
+$("forgot").addEventListener("click", async event => {
+  event.preventDefault();
+  const email = $("email").value.trim();
+  if (!configured) { $("status").textContent = "Connect your Firebase project first to enable password reset."; return; }
+  if (!email || !email.includes("@")) { $("status").textContent = "Enter your account email above first."; return; }
+  try {
+    await sendPasswordResetEmail(auth, email);
+    $("status").textContent = "If the account exists, Firebase will send a password-reset email.";
+  } catch {
+    $("status").textContent = "Unable to send a reset email. Check your Firebase settings.";
+  }
+});
+
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  if (method === "phone") { $("status").textContent = "Phone sign-in is not configured in this demo. Choose Email / Username."; return; }
+  const email = $("email").value.trim();
+  const password = $("password").value;
+  if (!configured) { $("status").textContent = "Firebase is not connected yet. Add your Firebase web app configuration to enable sign-in."; return; }
+  $("submit").disabled = true;
+  $("submit").textContent = "Please wait…";
+  try {
+    const result = await signInWithEmailAndPassword(auth, email, password);
+    await addDoc(collection(db, "login_activity"), {
+      uid: result.user.uid,
+      email: result.user.email,
+      event: "login",
+      occurredAt: serverTimestamp()
+    });
+    $("status").textContent = "Signed in successfully.";
+    $("password").value = "";
+  } catch (error) {
+    $("status").textContent = error.code === "auth/invalid-credential"
+      ? "The email or password is incorrect."
+      : "Sign-in failed. Check your details and Firebase configuration.";
+  } finally {
+    $("submit").textContent = "Log in";
+    refresh();
+  }
+});
+</script>
+</body>
+</html>
